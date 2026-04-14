@@ -77,10 +77,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     // Only load if bounded to session fetch success
-    if (!isPending && session) {
+    if (!isPending && session?.user?.id) {
        loadData();
     }
-  }, [isPending, session]);
+  }, [isPending, session?.user?.id]);
 
   // Real-time synchronization
   useEffect(() => {
