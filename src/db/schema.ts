@@ -69,3 +69,12 @@ export const transactions = pgTable("transactions", {
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 });
+
+export const budgets = pgTable("budgets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  categoryId: uuid("categoryId").notNull().references(() => categories.id),
+  userId: text("userId").notNull().references(() => user.id),
+  monthlyLimit: decimal("monthlyLimit", { precision: 12, scale: 2 }).notNull(),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+});
