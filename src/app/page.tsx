@@ -1,9 +1,28 @@
 "use client";
 
-import { motion, Variants } from "framer-motion";
+import { motion, Variants, useScroll, useTransform } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { useSession } from "@/lib/auth-client";
+import { Suspense, useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
+
+const ParticleField = dynamic(() => import("@/components/landing/ParticleField"), {
+  ssr: false,
+  loading: () => null,
+});
+
+const FeatureCard3D = dynamic(() => import("@/components/landing/FeatureCard3D"), {
+  ssr: false,
+  loading: () => <div className="glass-card rounded-2xl p-7 h-[220px] animate-pulse" />,
+});
+
+const SafetySection = dynamic(() => import("@/components/landing/SafetySection"), {
+  ssr: false,
+  loading: () => <div className="h-[600px]" />,
+});
+
+/* ======================== DATA ======================== */
 
 const features = [
   {
@@ -22,7 +41,7 @@ const features = [
       </svg>
     ),
     title: "Fraud Detection",
-    description: "AI-powered transaction analysis flags suspicious activity before it impacts your finances.",
+    description: "XGBoost ML model analyzes every transaction in real-time, flagging suspicious activity instantly.",
   },
   {
     icon: (
@@ -45,23 +64,154 @@ const features = [
 ];
 
 const stats = [
-  { value: "99.9%", label: "Uptime" },
-  { value: "<50ms", label: "API Response" },
-  { value: "256-bit", label: "Encryption" },
-  { value: "24/7", label: "Monitoring" },
+  { value: 99.9, suffix: "%", label: "Uptime" },
+  { value: 50, prefix: "<", suffix: "ms", label: "API Response" },
+  { value: 256, suffix: "-bit", label: "Encryption" },
+  { value: 24, suffix: "/7", label: "Monitoring" },
 ];
+
+const steps = [
+  {
+    number: "01",
+    title: "Add Transaction",
+    description: "Log your expenses with merchant, amount, and category data.",
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+      </svg>
+    ),
+  },
+  {
+    number: "02",
+    title: "ML Analysis",
+    description: "Our XGBoost model analyzes 30+ features to detect anomalies.",
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+  {
+    number: "03",
+    title: "Instant Alert",
+    description: "Fraud flagged? You get a real-time dashboard alert + email notification.",
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+      </svg>
+    ),
+  },
+  {
+    number: "04",
+    title: "Multi-Device Sync",
+    description: "WebSocket-powered updates reflect across all your devices instantly.",
+    icon: (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.858 15.355-5.858 21.213 0" />
+      </svg>
+    ),
+  },
+];
+
+const techStack = [
+  "Next.js", "TypeScript", "Drizzle ORM", "Neon DB",
+  "BetterAuth", "XGBoost", "Pusher", "Upstash Redis", "Resend"
+];
+
+/* ======================== ANIMATIONS ======================== */
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 30 },
   visible: (i: number) => ({
     opacity: 1,
     y: 0,
-    transition: { delay: i * 0.1, duration: 0.6, ease: "easeOut" },
+    transition: { delay: i * 0.1, duration: 0.6, ease: "easeOut" as const },
   }),
 };
 
+const slideInLeft: Variants = {
+  hidden: { opacity: 0, x: -60 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.6, ease: "easeOut" as const },
+  },
+};
+
+const slideInRight: Variants = {
+  hidden: { opacity: 0, x: 60 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.6, ease: "easeOut" as const },
+  },
+};
+
+const scaleIn: Variants = {
+  hidden: { opacity: 0, scale: 0.9 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { duration: 0.5, ease: "easeOut" as const },
+  },
+};
+
+/* ======================== COUNTER COMPONENT ======================== */
+
+function AnimatedCounter({ value, prefix = "", suffix = "" }: { value: number; prefix?: string; suffix?: string }) {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setInView(true); },
+      { threshold: 0.5 }
+    );
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!inView) return;
+    const duration = 1500;
+    const stepTime = 20;
+    const totalSteps = duration / stepTime;
+    const increment = value / totalSteps;
+    let current = 0;
+    const timer = setInterval(() => {
+      current += increment;
+      if (current >= value) {
+        setCount(value);
+        clearInterval(timer);
+      } else {
+        setCount(Math.floor(current));
+      }
+    }, stepTime);
+    return () => clearInterval(timer);
+  }, [inView, value]);
+
+  return (
+    <span ref={ref} className="animate-counter-glow">
+      {prefix}{count}{suffix}
+    </span>
+  );
+}
+
+/* ======================== MAIN PAGE ======================== */
+
 export default function LandingPage() {
   const { data: session, isPending } = useSession();
+  const [scrolled, setScrolled] = useState(false);
+  const heroRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll();
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.15], [1, 0]);
+
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 50);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#020617] text-white overflow-hidden">
@@ -69,19 +219,26 @@ export default function LandingPage() {
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-cyan-500/5 blur-[120px]" />
         <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-violet-500/5 blur-[120px]" />
+        <div className="absolute top-[40%] left-[50%] w-[400px] h-[400px] rounded-full bg-sky-500/3 blur-[100px]" />
       </div>
 
-      {/* Navigation */}
-      <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 lg:px-20 py-5 border-b border-slate-800/60">
+      {/* ===== NAVIGATION (Frosted Glass on Scroll) ===== */}
+      <nav
+        className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-12 lg:px-20 py-4 transition-all duration-300 ${
+          scrolled
+            ? "nav-frosted border-b border-slate-800/60 shadow-lg shadow-black/20"
+            : "bg-transparent"
+        }`}
+      >
         <div className="flex items-center gap-3">
-          <Image src="/Logo.jpeg" alt="Fintellix" width={44} height={44} className="rounded-lg object-contain" />
+          <Image src="/Logo.jpeg" alt="Fintellix" width={40} height={40} className="rounded-lg object-contain" />
           <span className="text-xl font-bold tracking-tight">Fintellix</span>
         </div>
         <div className="flex items-center gap-4">
           {!isPending && session ? (
             <Link
               href="/dashboard"
-              className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-cyan-500 text-[#020617] hover:bg-cyan-400 transition"
+              className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-cyan-500 text-[#020617] hover:bg-cyan-400 transition animate-glow-pulse"
             >
               Go to Dashboard
             </Link>
@@ -95,7 +252,7 @@ export default function LandingPage() {
               </Link>
               <Link
                 href="/login"
-                className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-cyan-500 text-[#020617] hover:bg-cyan-400 transition"
+                className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-cyan-500 text-[#020617] hover:bg-cyan-400 transition animate-glow-pulse"
               >
                 Get Started
               </Link>
@@ -104,67 +261,115 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative z-10 max-w-6xl mx-auto px-6 md:px-12 pt-20 md:pt-32 pb-20 text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7 }}
-        >
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 mb-8 rounded-full border border-slate-700 bg-slate-800/40 text-xs font-medium text-slate-300">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            Powered by Machine Learning
-          </div>
+      {/* ===== HERO SECTION ===== */}
+      <section ref={heroRef} className="relative z-10 min-h-screen flex items-center justify-center pt-20">
+        {/* Three.js Particle Background */}
+        <Suspense fallback={null}>
+          <ParticleField />
+        </Suspense>
 
-          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight">
-            Intelligent Finance.
-            <br />
-            <span className="bg-gradient-to-r from-cyan-400 via-sky-400 to-violet-400 bg-clip-text text-transparent">
+        <motion.div style={{ opacity: heroOpacity }} className="relative z-10 max-w-6xl mx-auto px-6 md:px-12 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7 }}
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 mb-8 rounded-full border border-slate-700 bg-slate-800/40 text-xs font-medium text-slate-300">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+              Powered by Machine Learning
+            </div>
+          </motion.div>
+
+          {/* Staggered hero text */}
+          <motion.h1
+            className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight"
+            initial="hidden"
+            animate="visible"
+          >
+            <motion.span
+              variants={fadeUp}
+              custom={0}
+              className="block"
+            >
+              Intelligent Finance.
+            </motion.span>
+            <motion.span
+              variants={fadeUp}
+              custom={1}
+              className="block bg-gradient-to-r from-cyan-400 via-sky-400 to-violet-400 bg-clip-text text-transparent"
+            >
               Zero Fraud.
-            </span>
-          </h1>
+            </motion.span>
+          </motion.h1>
 
-          <p className="mt-6 text-lg md:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
+            className="mt-6 text-lg md:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed"
+          >
             Fintellix combines real-time expense tracking with AI-driven fraud detection
             to give you complete control over your finances — securely and intelligently.
-          </p>
+          </motion.p>
 
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.6 }}
+            className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
+          >
             <Link
               href="/login"
-              className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-cyan-500 text-[#020617] font-semibold text-base hover:bg-cyan-400 transition shadow-lg shadow-cyan-500/20"
+              className="group relative w-full sm:w-auto px-8 py-3.5 rounded-xl bg-cyan-500 text-[#020617] font-semibold text-base hover:bg-cyan-400 transition shadow-lg shadow-cyan-500/20 animate-glow-pulse"
             >
-              Start Tracking Free →
+              Start Tracking Free
+              <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">→</span>
             </Link>
             <a
               href="#features"
-              className="w-full sm:w-auto px-8 py-3.5 rounded-xl border border-slate-700 text-slate-300 font-medium text-base hover:bg-slate-800 transition"
+              className="w-full sm:w-auto px-8 py-3.5 rounded-xl border border-slate-700 text-slate-300 font-medium text-base hover:bg-slate-800/60 hover:border-slate-600 transition"
             >
               Learn More
             </a>
-          </div>
+          </motion.div>
+
+          {/* Animated Stats bar */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8, duration: 0.6 }}
+            className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto"
+          >
+            {stats.map((stat, i) => (
+              <div key={i} className="text-center">
+                <p className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-cyan-400 to-sky-300 bg-clip-text text-transparent">
+                  <AnimatedCounter value={stat.value} prefix={stat.prefix} suffix={stat.suffix} />
+                </p>
+                <p className="mt-1 text-sm text-slate-500">{stat.label}</p>
+              </div>
+            ))}
+          </motion.div>
         </motion.div>
 
-        {/* Stats bar */}
+        {/* Scroll indicator */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.6 }}
-          className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2 }}
+          className="absolute bottom-8 left-1/2 -translate-x-1/2"
         >
-          {stats.map((stat, i) => (
-            <div key={i} className="text-center">
-              <p className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-cyan-400 to-sky-300 bg-clip-text text-transparent">
-                {stat.value}
-              </p>
-              <p className="mt-1 text-sm text-slate-500">{stat.label}</p>
-            </div>
-          ))}
+          <motion.div
+            animate={{ y: [0, 8, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+            className="w-6 h-10 rounded-full border-2 border-slate-600 flex items-start justify-center p-1.5"
+          >
+            <div className="w-1.5 h-2.5 rounded-full bg-cyan-400" />
+          </motion.div>
         </motion.div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="relative z-10 max-w-6xl mx-auto px-6 md:px-12 py-20">
+      {/* ===== FEATURES SECTION ===== */}
+      <section id="features" className="relative z-10 max-w-6xl mx-auto px-6 md:px-12 py-24">
         <motion.div
           initial="hidden"
           whileInView="visible"
@@ -182,53 +387,131 @@ export default function LandingPage() {
           </motion.p>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-6" style={{ perspective: "1200px" }}>
           {features.map((feature, i) => (
+            <FeatureCard3D
+              key={i}
+              index={i}
+              title={feature.title}
+              description={feature.description}
+              icon={feature.icon}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* ===== HOW IT WORKS SECTION ===== */}
+      <section className="relative z-10 max-w-6xl mx-auto px-6 md:px-12 py-24">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+          className="text-center mb-16"
+        >
+          <motion.p variants={fadeUp} custom={0} className="text-sm font-semibold text-violet-400 uppercase tracking-widest mb-3">
+            How It Works
+          </motion.p>
+          <motion.h2 variants={fadeUp} custom={1} className="text-3xl md:text-4xl font-bold tracking-tight">
+            From transaction to protection in milliseconds
+          </motion.h2>
+        </motion.div>
+
+        <div className="grid md:grid-cols-4 gap-6 relative">
+          {/* Connecting line (desktop) */}
+          <div className="hidden md:block absolute top-[60px] left-[12.5%] right-[12.5%] h-[2px] bg-gradient-to-r from-cyan-500/30 via-violet-500/30 to-cyan-500/30 animate-line-pulse" />
+
+          {steps.map((step, i) => (
             <motion.div
               key={i}
               initial="hidden"
               whileInView="visible"
-              viewport={{ once: true, margin: "-50px" }}
+              viewport={{ once: true }}
               variants={fadeUp}
               custom={i}
-              className="group rounded-2xl border border-slate-800 bg-[#0f172a]/60 p-7 hover:border-slate-700 hover:bg-[#0f172a] transition-all duration-300"
+              className="relative text-center"
             >
-              <div className="w-12 h-12 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mb-4 group-hover:bg-cyan-500/20 transition">
-                {feature.icon}
-              </div>
-              <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">{feature.description}</p>
+              {/* Step circle */}
+              <motion.div
+                whileHover={{ scale: 1.1 }}
+                className="mx-auto w-[72px] h-[72px] rounded-2xl bg-gradient-to-br from-cyan-500/20 to-violet-500/20 border border-slate-700/50 flex items-center justify-center mb-5 relative z-10"
+              >
+                <div className="text-cyan-400">
+                  {step.icon}
+                </div>
+              </motion.div>
+
+              <p className="text-xs font-bold text-cyan-400/60 mb-1">{step.number}</p>
+              <h3 className="text-base font-semibold mb-2">{step.title}</h3>
+              <p className="text-sm text-slate-400 leading-relaxed">{step.description}</p>
             </motion.div>
           ))}
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* ===== STAY SAFE SECTION ===== */}
+      <SafetySection />
+
+      {/* ===== TECH STACK SECTION ===== */}
+      <section className="relative z-10 max-w-6xl mx-auto px-6 md:px-12 py-16">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="text-center mb-10"
+        >
+          <motion.p variants={fadeUp} custom={0} className="text-sm font-semibold text-slate-500 uppercase tracking-widest mb-3">
+            Built With
+          </motion.p>
+        </motion.div>
+
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          className="flex flex-wrap justify-center gap-3"
+        >
+          {techStack.map((tech, i) => (
+            <motion.span
+              key={tech}
+              variants={scaleIn}
+              custom={i}
+              className="px-4 py-2 rounded-full border border-slate-800 bg-slate-900/50 text-xs font-medium text-slate-400 hover:border-cyan-500/30 hover:text-cyan-400 transition-all duration-300 cursor-default"
+            >
+              {tech}
+            </motion.span>
+          ))}
+        </motion.div>
+      </section>
+
+      {/* ===== CTA SECTION ===== */}
       <section className="relative z-10 max-w-6xl mx-auto px-6 md:px-12 py-20">
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="rounded-3xl border border-slate-800 bg-gradient-to-br from-[#0f172a] to-[#020617] p-10 md:p-16 text-center"
         >
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-            Ready to take control of your finances?
-          </h2>
-          <p className="text-slate-400 max-w-lg mx-auto mb-8">
-            Join Fintellix today and experience intelligent expense tracking with
-            AI-powered fraud detection — completely free.
-          </p>
-          <Link
-            href="/login"
-            className="inline-flex px-8 py-3.5 rounded-xl bg-cyan-500 text-[#020617] font-semibold text-base hover:bg-cyan-400 transition shadow-lg shadow-cyan-500/20"
-          >
-            Get Started — It&apos;s Free →
-          </Link>
+          <div className="gradient-border-wrapper">
+            <div className="rounded-3xl bg-gradient-to-br from-[#0f172a] to-[#020617] p-10 md:p-16 text-center">
+              <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+                Ready to take control of your finances?
+              </h2>
+              <p className="text-slate-400 max-w-lg mx-auto mb-8">
+                Join Fintellix today and experience intelligent expense tracking with
+                AI-powered fraud detection — completely free.
+              </p>
+              <Link
+                href="/login"
+                className="inline-flex px-8 py-3.5 rounded-xl bg-cyan-500 text-[#020617] font-semibold text-base hover:bg-cyan-400 transition shadow-lg shadow-cyan-500/20 animate-glow-pulse"
+              >
+                Get Started — It&apos;s Free →
+              </Link>
+            </div>
+          </div>
         </motion.div>
       </section>
 
-      {/* Footer */}
+      {/* ===== FOOTER ===== */}
       <footer className="relative z-10 border-t border-slate-800/60 px-6 md:px-12 lg:px-20 py-8">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">

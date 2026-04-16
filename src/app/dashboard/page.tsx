@@ -11,6 +11,7 @@ import { getCategories, createCategory } from "@/app/actions/categories";
 import { getBudgets } from "@/app/actions/budgets";
 import { TransactionsTable } from "@/components/ui/TransactionsTable";
 import { AddTransactionModal } from "@/components/ui/AddTransactionModal";
+import { Loader } from "@/components/ui/Loader";
 import { CategoryChart } from "@/components/dashboard/CategoryChart";
 import { SpendingChart } from "@/components/dashboard/SpendingChart";
 import { BudgetTracker } from "@/components/dashboard/BudgetTracker";
@@ -122,11 +123,7 @@ export default function DashboardPage() {
   };
 
   if (isPending || isLoadingData) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-[#020617]">
-        <div className="h-10 w-10 animate-spin rounded-full border-b-4 border-cyan-500"></div>
-      </div>
-    );
+    return <Loader fullScreen text="SYNCING DATA" />;
   }
 
   // Derived Stats
