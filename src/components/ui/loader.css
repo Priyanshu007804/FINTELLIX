@@ -1,0 +1,105 @@
+.fintellix-loader-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+}
+
+.core-socket {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Outer rotating dashed ring */
+.orbital-ring {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  border: 2px dashed rgba(34, 211, 238, 0.4);
+  animation: orbit-spin 6s linear infinite;
+}
+
+.orbital-ring::before {
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: #22d3ee;
+  border-bottom-color: #8b5cf6;
+  animation: orbit-spin 3s linear infinite reverse;
+}
+
+/* Center Hexagon Array */
+.hex-grid {
+  position: relative;
+  width: 50px;
+  height: 50px;
+}
+
+.hex-node {
+  position: absolute;
+  width: 14px;
+  height: 16px;
+  background: rgba(34, 211, 238, 0.1);
+  border: 1px solid rgba(34, 211, 238, 0.8);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  animation: pulse-hex 1.5s ease-in-out infinite;
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+}
+
+/* Positioning 7 hexagons (1 center, 6 surrounding) */
+.hex-center { top: 17px; left: 18px; animation-delay: 0s; background: rgba(34, 211, 238, 0.4); }
+.hex-t-l { top: 2px; left: 9px; animation-delay: 0.1s; }
+.hex-t-r { top: 2px; left: 27px; animation-delay: 0.2s; }
+.hex-r { top: 17px; left: 36px; animation-delay: 0.3s; }
+.hex-b-r { top: 32px; left: 27px; animation-delay: 0.4s; }
+.hex-b-l { top: 32px; left: 9px; animation-delay: 0.5s; }
+.hex-l { top: 17px; left: 0px; animation-delay: 0.6s; }
+
+/* Text scanner */
+.scan-text {
+  position: absolute;
+  bottom: -35px;
+  font-family: monospace;
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: #22d3ee;
+  text-transform: uppercase;
+  animation: text-flicker 2s linear infinite;
+}
+
+/* Keyframes */
+@keyframes orbit-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse-hex {
+  0%, 100% { 
+    transform: scale(0.8); 
+    opacity: 0.3; 
+    background: rgba(34, 211, 238, 0.1);
+  }
+  50% { 
+    transform: scale(1.1); 
+    opacity: 1; 
+    background: rgba(34, 211, 238, 0.6);
+    box-shadow: 0 0 15px rgba(34, 211, 238, 0.8);
+  }
+}
+
+@keyframes text-flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
