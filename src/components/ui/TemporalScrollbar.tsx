@@ -18,6 +18,9 @@ export function TemporalScrollbar() {
 
   // Calculate dynamic line height based on scroll progress (0vh to 100vh)
   const lineHeight = useTransform(smoothProgress, [0, 1], ["0%", "100%"]);
+  
+  // Calculate the thumb's top position
+  const thumbTop = useTransform(smoothProgress, [0, 1], ["0%", "calc(100% - 30px)"]);
 
   useEffect(() => {
     // Detect mobile touch devices since custom scrollbars can interrupt touch flows
@@ -73,7 +76,7 @@ export function TemporalScrollbar() {
         className="absolute w-[6px] h-[30px] rounded-full bg-cyan-300 pointer-events-none"
         style={{
           // Move from 0% (top) to 100% (bottom of screen), offset by thumb height to stay on screen
-          top: useTransform(smoothProgress, [0, 1], ["0%", "calc(100% - 30px)"]),
+          top: thumbTop,
           boxShadow: isScrolling || isHovered
             ? "0 0 10px 2px rgba(34, 211, 238, 0.6), 0 0 20px 4px rgba(34, 211, 238, 0.4)"
             : "0 0 5px 1px rgba(34, 211, 238, 0.3)",

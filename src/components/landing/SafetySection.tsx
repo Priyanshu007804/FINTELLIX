@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, Variants, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 import { safetyData, type SafetyNode } from "./SafetyOrbit";
@@ -53,6 +53,14 @@ const categoryMeta = {
 
 export default function SafetySection() {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(true);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const hoveredNode = useMemo(
     () => safetyData.find((n) => n.id === hoveredId) || null,
@@ -112,11 +120,13 @@ export default function SafetySection() {
 
       {/* Desktop: 3D Orbit + Info Card */}
       <div className="hidden md:block relative" style={{ height: "550px" }}>
-        <SafetyOrbit
-          hoveredId={hoveredId}
-          onHover={(id) => setHoveredId(id)}
-          onUnhover={() => setHoveredId(null)}
-        />
+        {!isMobile && (
+          <SafetyOrbit
+            hoveredId={hoveredId}
+            onHover={(id) => setHoveredId(id)}
+            onUnhover={() => setHoveredId(null)}
+          />
+        )}
 
         {/* Floating Info Card */}
         <AnimatePresence>

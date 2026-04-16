@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Float, MeshDistortMaterial } from "@react-three/drei";
 import * as THREE from "three";
@@ -134,6 +134,14 @@ interface FeatureCard3DProps {
 export default function FeatureCard3D({ index, title, description, icon }: FeatureCard3DProps) {
   const [hovered, setHovered] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(true); // Default true to prevent heavy initial load
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // Mouse tracking for tilt
   const mouseX = useMotionValue(0);
@@ -203,29 +211,37 @@ export default function FeatureCard3D({ index, title, description, icon }: Featu
         }}
       />
 
-      {/* 3D Icon Canvas */}
+      {/* 3D Icon Canvas (Disabled on mobile) */}
       <div
         className="w-20 h-20 mb-5 rounded-xl relative"
         style={{ transform: "translateZ(40px)" }}
       >
-        <Canvas
-          camera={{ position: [0, 0, 3], fov: 45 }}
-          dpr={[1, 2]}
-          gl={{ antialias: true, alpha: true }}
-          style={{ background: "transparent" }}
-        >
-          <ambientLight intensity={0.4} />
-          <pointLight position={[3, 3, 3]} intensity={1} color="#22d3ee" />
-          <pointLight position={[-3, -3, 2]} intensity={0.5} color="#a78bfa" />
-          <Float speed={2} rotationIntensity={0.3} floatIntensity={0.5}>
-            <IconComponent hovered={hovered} />
-          </Float>
-        </Canvas>
+        {!isMobile ? (
+          <Canvas
+            camera={{ position: [0, 0, 3], fov: 45 }}
+            dpr={[1, 1.5]}
+            gl={{ antialias: false, alpha: true, powerPreference: "low-power" }}
+            style={{ background: "transparent" }}
+          >
+            <ambientLight intensity={0.4} />
+            <pointLight position={[3, 3, 3]} intensity={1} color="#22d3ee" />
+            <pointLight position={[-3, -3, 2]} intensity={0.5} color="#a78bfa" />
+            <Float speed={2} rotationIntensity={0.3} floatIntensity={0.5}>
+              <IconComponent hovered={hovered} />
+            </Float>
+          </Canvas>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-cyan-400 opacity-100 animate-float">
+            {icon}
+          </div>
+        )}
 
-        {/* Fallback SVG (visible until canvas loads, provides accessibility) */}
-        <div className="absolute inset-0 flex items-center justify-center text-cyan-400 opacity-0 pointer-events-none">
-          {icon}
-        </div>
+        {/* Fallback SVG for desktop while loading */}
+        {!isMobile && (
+          <div className="absolute inset-0 flex items-center justify-center text-cyan-400 opacity-0 pointer-events-none">
+            {icon}
+          </div>
+        )}
       </div>
 
       <h3
