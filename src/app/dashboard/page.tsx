@@ -18,6 +18,7 @@ import { BudgetTracker } from "@/components/dashboard/BudgetTracker";
 import { FraudAlertBanner } from "@/components/dashboard/FraudAlertBanner";
 import { TransactionFilters, type FilterState } from "@/components/ui/TransactionFilters";
 import { exportAsCSV, exportAsPDF } from "@/lib/export";
+import { AskAI } from "@/components/dashboard/AskAI";
 
 export default function DashboardPage() {
   const { data: session, isPending } = useSession();
@@ -272,6 +273,9 @@ export default function DashboardPage() {
           }
         }}
       />
+      
+      {/* AI Assistant */}
+      <AskAI />
     </div>
   );
 }
