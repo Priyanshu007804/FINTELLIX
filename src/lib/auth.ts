@@ -6,7 +6,15 @@ if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
   console.warn("Google Client ID or Secret is not defined in environment variables!");
 }
 
+// Determine the base URL for this deployment
+const getBaseURL = () => {
+    if (process.env.BETTER_AUTH_URL) return process.env.BETTER_AUTH_URL;
+    if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+    return "http://localhost:3000";
+};
+
 export const auth = betterAuth({
+    baseURL: getBaseURL(),
     database: drizzleAdapter(db, {
         provider: "pg",
     }),
@@ -21,3 +29,4 @@ export const auth = betterAuth({
         "https://*.vercel.app",
     ],
 });
+
