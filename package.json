@@ -9,11 +9,14 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ai-sdk/google": "^3.0.64",
+    "@ai-sdk/react": "^3.0.170",
     "@neondatabase/serverless": "^1.0.2",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
+    "ai": "^6.0.168",
     "better-auth": "^1.6.2",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
@@ -26,6 +29,7 @@
     "pusher-js": "^8.5.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
     "resend": "^6.11.0",
     "tailwind-merge": "^3.5.0",

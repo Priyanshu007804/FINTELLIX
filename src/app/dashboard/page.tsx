@@ -9,6 +9,7 @@ import Image from "next/image";
 import { getTransactions } from "@/app/actions/transactions";
 import { getCategories, createCategory } from "@/app/actions/categories";
 import { getBudgets } from "@/app/actions/budgets";
+import { getStockDashboardData, type StockDashboardView } from "@/app/actions/stocks";
 import { TransactionsTable } from "@/components/ui/TransactionsTable";
 import { AddTransactionModal } from "@/components/ui/AddTransactionModal";
 import { Loader } from "@/components/ui/Loader";
@@ -16,8 +17,10 @@ import { CategoryChart } from "@/components/dashboard/CategoryChart";
 import { SpendingChart } from "@/components/dashboard/SpendingChart";
 import { BudgetTracker } from "@/components/dashboard/BudgetTracker";
 import { FraudAlertBanner } from "@/components/dashboard/FraudAlertBanner";
+import { StocksSection } from "@/components/dashboard/StocksSection";
 import { TransactionFilters, type FilterState } from "@/components/ui/TransactionFilters";
 import { exportAsCSV, exportAsPDF } from "@/lib/export";
+import { AskAI } from "@/components/dashboard/AskAI";
 
 export default function DashboardPage() {
   const { data: session, isPending } = useSession();
@@ -31,6 +34,7 @@ export default function DashboardPage() {
   const [filters, setFilters] = useState<FilterState>({ search: "", categoryId: "", dateFrom: "", dateTo: "" });
   const [exportOpen, setExportOpen] = useState(false);
   const [fraudAlert, setFraudAlert] = useState<any>(null);
+  const [stockDashboard, setStockDashboard] = useState<StockDashboardView | null>(null);
 
   const loadData = async () => {
     setIsLoadingData(true);
@@ -38,8 +42,9 @@ export default function DashboardPage() {
       const [txRes, catRes, budgetRes] = await Promise.all([
         getTransactions(),
         getCategories(),
-        getBudgets()
+        getBudgets(),
       ]);
+      const stockRes = await getStockDashboardData();
 
       if (catRes.success) {
         let fetchedCategories = catRes.data || [];
@@ -69,6 +74,9 @@ export default function DashboardPage() {
       if (budgetRes.success && budgetRes.data) {
         setBudgetsList(budgetRes.data);
       }
+      if (stockRes.success && stockRes.data) {
+        setStockDashboard(stockRes.data);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -87,22 +95,32 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!session?.user?.id) return;
 
+    let isActive = true;
+    let pusherClient: { unsubscribe: (channelName: string) => void } | null = null;
+    let channelName = "";
+
     import("@/lib/pusher").then(({ getPusherClient }) => {
+      if (!isActive) return;
+
       const pusher = getPusherClient();
       if (!pusher) return;
 
-      const channelName = `user-${session.user.id}`;
+      pusherClient = pusher;
+      channelName = `user-${session.user.id}`;
       const channel = pusher.subscribe(channelName);
-      
+
       channel.bind("update_data", (data: any) => {
         console.log("Real-time update received:", data);
         loadData();
       });
-
-      return () => {
-        pusher.unsubscribe(channelName);
-      };
     });
+
+    return () => {
+      isActive = false;
+      if (pusherClient && channelName) {
+        pusherClient.unsubscribe(channelName);
+      }
+    };
   }, [session?.user?.id]);
 
   useEffect(() => {
@@ -181,7 +199,7 @@ export default function DashboardPage() {
         <div className="grid gap-6 md:grid-cols-3 mb-8">
            <div className="rounded-2xl border border-slate-800 bg-[#0f172a] p-6 shadow-sm">
               <h2 className="text-sm font-medium text-slate-400">Total Expenses (All Time)</h2>
-              <p className="mt-2 text-4xl font-bold tracking-tight">₹{totalExpenses.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+              <p className="mt-2 text-4xl font-bold tracking-tight">INR {totalExpenses.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
            </div>
            <div className="rounded-2xl border border-slate-800 bg-[#0f172a] p-6 shadow-sm">
               <h2 className="text-sm font-medium text-slate-400">Total Transactions</h2>
@@ -205,6 +223,8 @@ export default function DashboardPage() {
         <div className="mb-8">
            <BudgetTracker categories={categories} budgets={budgetsList} transactions={transactions} onUpdate={loadData} />
         </div>
+
+        <StocksSection data={stockDashboard} onRefresh={loadData} />
 
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
            <h2 className="text-xl font-semibold">Transaction History</h2>
@@ -272,6 +292,9 @@ export default function DashboardPage() {
           }
         }}
       />
+      
+      {/* AI Assistant */}
+      <AskAI />
     </div>
   );
 }
