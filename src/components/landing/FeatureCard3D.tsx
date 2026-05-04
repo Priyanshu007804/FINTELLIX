@@ -5,6 +5,12 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { Float, MeshDistortMaterial } from "@react-three/drei";
 import * as THREE from "three";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger);
+}
 
 /* =================== 3D ICON SHAPES =================== */
 
@@ -134,6 +140,7 @@ interface FeatureCard3DProps {
 export default function FeatureCard3D({ index, title, description, icon }: FeatureCard3DProps) {
   const [hovered, setHovered] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const glowLineRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(true); // Default true to prevent heavy initial load
 
   useEffect(() => {
@@ -142,6 +149,54 @@ export default function FeatureCard3D({ index, title, description, icon }: Featu
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  /* ===== GSAP ScrollTrigger entrance ===== */
+  useEffect(() => {
+    const card = cardRef.current;
+    const glowLine = glowLineRef.current;
+    if (!card) return;
+
+    /* initial hidden state */
+    gsap.set(card, {
+      opacity: 0,
+      y: 60,
+      scale: 0.92,
+      rotateX: index % 2 === 0 ? 8 : -8,
+    });
+    if (glowLine) gsap.set(glowLine, { scaleX: 0, transformOrigin: "left center" });
+
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: card,
+        start: "top 85%",
+        end: "top 55%",
+        scrub: 0.6,
+        once: true,
+      },
+    });
+
+    tl.to(card, {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      rotateX: 0,
+      duration: 1,
+      ease: "power3.out",
+      delay: index * 0.1,
+    });
+
+    if (glowLine) {
+      tl.to(
+        glowLine,
+        { scaleX: 1, duration: 0.8, ease: "power2.out" },
+        "-=0.5"
+      );
+    }
+
+    return () => {
+      tl.kill();
+    };
+  }, [index]);
 
   // Mouse tracking for tilt
   const mouseX = useMotionValue(0);
@@ -179,17 +234,6 @@ export default function FeatureCard3D({ index, title, description, icon }: Featu
   return (
     <motion.div
       ref={cardRef}
-      initial="hidden"
-      whileInView="visible"
-      viewport={{ once: true, margin: "-50px" }}
-      variants={{
-        hidden: { opacity: 0, x: index % 2 === 0 ? -60 : 60 },
-        visible: {
-          opacity: 1,
-          x: 0,
-          transition: { duration: 0.6, ease: "easeOut" as const },
-        },
-      }}
       style={{
         rotateX,
         rotateY,
@@ -200,6 +244,11 @@ export default function FeatureCard3D({ index, title, description, icon }: Featu
       onMouseLeave={handleMouseLeave}
       className="group glass-card rounded-2xl p-7 transition-all duration-300 cursor-default relative overflow-hidden"
     >
+      {/* ScrollTrigger glow line across bottom */}
+      <div
+        ref={glowLineRef}
+        className="absolute bottom-0 left-0 h-[2px] w-full bg-gradient-to-r from-cyan-500 via-teal-400 to-violet-500 shadow-[0_0_12px_2px_rgba(34,211,238,0.3)]"
+      />
       {/* Hover glow effect */}
       <div
         className={`absolute inset-0 rounded-2xl transition-opacity duration-500 pointer-events-none ${
