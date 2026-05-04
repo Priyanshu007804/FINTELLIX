@@ -22,6 +22,11 @@ const SafetySection = dynamic(() => import("@/components/landing/SafetySection")
   loading: () => <div className="h-[600px]" />,
 });
 
+const ScrollStorySection = dynamic(() => import("@/components/landing/ScrollStorySection"), {
+  ssr: false,
+  loading: () => <div className="h-screen" />,
+});
+
 /* ======================== DATA ======================== */
 
 const features = [
@@ -447,6 +452,9 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
+
+      {/* ===== SCROLL STORY SECTION ===== */}
+      <ScrollStorySection />
 
       {/* ===== STAY SAFE SECTION ===== */}
       <SafetySection />
