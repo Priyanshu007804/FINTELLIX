@@ -76,7 +76,7 @@ export async function upsertBudget(categoryId: string, monthlyLimit: number) {
 export async function deleteBudget(budgetId: string) {
   try {
     const userId = await getUserId();
-    await db.delete(budgets).where(eq(budgets.id, budgetId));
+    await db.delete(budgets).where(and(eq(budgets.id, budgetId), eq(budgets.userId, userId)));
     
     pusherServer.trigger(`user-${userId}`, "update_data", { type: "budget" }).catch(console.error);
 

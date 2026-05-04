@@ -1,4 +1,5 @@
-import { pgTable, text, timestamp, boolean, decimal, uuid, AnyPgColumn } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+import { pgTable, text, timestamp, boolean, decimal, uuid } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -78,3 +79,56 @@ export const budgets = pgTable("budgets", {
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 });
+
+export const stockHoldings = pgTable("stock_holdings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("userId").notNull().references(() => user.id),
+  symbol: text("symbol").notNull(),
+  companyName: text("companyName"),
+  exchange: text("exchange"),
+  quantity: decimal("quantity", { precision: 14, scale: 4 }).notNull(),
+  investedAmount: decimal("investedAmount", { precision: 14, scale: 2 }).notNull(),
+  currency: text("currency").notNull().default("USD"),
+  purchaseDate: timestamp("purchaseDate").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt").notNull().defaultNow(),
+});
+
+export const categoriesRelations = relations(categories, ({ many, one }) => ({
+  user: one(user, {
+    fields: [categories.userId],
+    references: [user.id],
+  }),
+  transactions: many(transactions),
+  budgets: many(budgets),
+}));
+
+export const transactionsRelations = relations(transactions, ({ one }) => ({
+  user: one(user, {
+    fields: [transactions.userId],
+    references: [user.id],
+  }),
+  category: one(categories, {
+    fields: [transactions.categoryId],
+    references: [categories.id],
+  }),
+}));
+
+export const budgetsRelations = relations(budgets, ({ one }) => ({
+  user: one(user, {
+    fields: [budgets.userId],
+    references: [user.id],
+  }),
+  category: one(categories, {
+    fields: [budgets.categoryId],
+    references: [categories.id],
+  }),
+}));
+
+export const stockHoldingsRelations = relations(stockHoldings, ({ one }) => ({
+  user: one(user, {
+    fields: [stockHoldings.userId],
+    references: [user.id],
+  }),
+}));
