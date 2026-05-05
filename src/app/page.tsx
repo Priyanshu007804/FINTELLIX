@@ -66,6 +66,24 @@ const features = [
     title: "Expense Tracking",
     description: "Categorize and monitor every transaction with detailed merchant and location metadata.",
   },
+  {
+    icon: (
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+      </svg>
+    ),
+    title: "Stock Studio",
+    description: "Manage your portfolio with live market data and deep-dive technical charts powered by yfinance.",
+  },
+  {
+    icon: (
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+      </svg>
+    ),
+    title: "AI Stock Forecast",
+    description: "Leverage XGBoost intelligence to predict stock price movements with a 7-day forecasting window.",
+  },
 ];
 
 const stats = [
@@ -89,7 +107,7 @@ const steps = [
   {
     number: "02",
     title: "ML Analysis",
-    description: "Our XGBoost model analyzes 30+ features to detect anomalies.",
+    description: "Our XGBoost model analyzes transactions for fraud and predicts stock trends in real-time.",
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -118,10 +136,6 @@ const steps = [
   },
 ];
 
-const techStack = [
-  "Next.js", "TypeScript", "Drizzle ORM", "Neon DB",
-  "BetterAuth", "XGBoost", "Pusher", "Upstash Redis", "Resend"
-];
 
 /* ======================== ANIMATIONS ======================== */
 
@@ -152,14 +166,6 @@ const slideInRight: Variants = {
   },
 };
 
-const scaleIn: Variants = {
-  hidden: { opacity: 0, scale: 0.9 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    transition: { duration: 0.5, ease: "easeOut" as const },
-  },
-};
 
 /* ======================== COUNTER COMPONENT ======================== */
 
@@ -392,7 +398,7 @@ export default function LandingPage() {
           </motion.p>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 gap-6" style={{ perspective: "1200px" }}>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6" style={{ perspective: "1200px" }}>
           {features.map((feature, i) => (
             <FeatureCard3D
               key={i}
@@ -459,37 +465,7 @@ export default function LandingPage() {
       {/* ===== STAY SAFE SECTION ===== */}
       <SafetySection />
 
-      {/* ===== TECH STACK SECTION ===== */}
-      <section className="relative z-10 max-w-6xl mx-auto px-6 md:px-12 py-16">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          className="text-center mb-10"
-        >
-          <motion.p variants={fadeUp} custom={0} className="text-sm font-semibold text-slate-500 uppercase tracking-widest mb-3">
-            Built With
-          </motion.p>
-        </motion.div>
 
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          className="flex flex-wrap justify-center gap-3"
-        >
-          {techStack.map((tech, i) => (
-            <motion.span
-              key={tech}
-              variants={scaleIn}
-              custom={i}
-              className="px-4 py-2 rounded-full border border-slate-800 bg-slate-900/50 text-xs font-medium text-slate-400 hover:border-cyan-500/30 hover:text-cyan-400 transition-all duration-300 cursor-default"
-            >
-              {tech}
-            </motion.span>
-          ))}
-        </motion.div>
-      </section>
 
       {/* ===== CTA SECTION ===== */}
       <section className="relative z-10 max-w-6xl mx-auto px-6 md:px-12 py-20">
