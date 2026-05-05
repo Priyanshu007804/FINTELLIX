@@ -23,6 +23,9 @@ type AlphaVantageGoldSpot = {
   price?: string;
 };
 
+import YahooFinance from 'yahoo-finance2';
+const yahooFinance = new YahooFinance();
+
 export interface LiveQuote {
   symbol: string;
   price: number;
@@ -447,67 +450,31 @@ function getYahooSymbolCandidates(symbol: string, exchange?: string | null) {
   return dedupe(candidates.filter(Boolean));
 }
 
-async function fetchYahooChart(symbol: string, range: string, interval: string) {
-  const cacheKey = `${symbol}|${range}|${interval}`;
-  const cached = yahooChartCache.get(cacheKey);
-
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.data;
-  }
-
-  const response = await fetch(
-    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}`,
-    { 
-      cache: "no-store",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "Accept": "application/json",
-      }
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Yahoo chart request failed with status ${response.status}`);
-  }
-
-  const data = (await response.json()) as YahooChartResponse;
-  yahooChartCache.set(cacheKey, {
-    expiresAt: Date.now() + (interval === "1d" ? 10 * 60_000 : 60_000),
-    data,
-  });
-
-  return data;
-}
-
 async function fetchYahooQuote(symbol: string, exchange?: string | null): Promise<LiveQuote | null> {
   const candidates = getYahooSymbolCandidates(symbol, exchange);
 
   for (const candidate of candidates) {
     try {
-      const data = await fetchYahooChart(candidate, "1mo", "1d");
-      const result = data.chart?.result?.[0];
-      const meta = result?.meta;
+      const quote = await yahooFinance.quote(candidate) as any;
+      if (!quote || typeof quote.regularMarketPrice !== "number") continue;
 
-      if (!meta?.regularMarketPrice) {
-        continue;
-      }
-
-      const previousClose = meta.chartPreviousClose ?? meta.previousClose ?? meta.regularMarketPrice;
-      const change = meta.regularMarketPrice - previousClose;
-      const changePercent = previousClose ? (change / previousClose) * 100 : 0;
+      const previousClose = quote.regularMarketPreviousClose ?? quote.regularMarketPrice;
+      const change = quote.regularMarketChange ?? (quote.regularMarketPrice - previousClose);
+      const changePercent = quote.regularMarketChangePercent ?? (previousClose ? (change / previousClose) * 100 : 0);
 
       return {
-        symbol: meta.symbol || candidate,
-        price: meta.regularMarketPrice,
+        symbol: quote.symbol || candidate,
+        price: quote.regularMarketPrice,
         previousClose,
         change,
         changePercent,
-        latestTradingDay: meta.regularMarketTime
-          ? new Date(meta.regularMarketTime * 1000).toISOString().slice(0, 10)
-          : "",
+        latestTradingDay: quote.regularMarketTime
+          ? new Date(quote.regularMarketTime).toISOString().slice(0, 10)
+          : new Date().toISOString().slice(0, 10),
         source: "yahoo",
       };
-    } catch {
+    } catch (e) {
+      console.error(`fetchYahooQuote failed for ${candidate}:`, e);
       continue;
     }
   }
@@ -520,43 +487,35 @@ async function fetchYahooHistory(symbol: string, exchange?: string | null): Prom
 
   for (const candidate of candidates) {
     try {
-      const data = await fetchYahooChart(candidate, "3mo", "1d");
-      const result = data.chart?.result?.[0];
-      const timestamps = result?.timestamp || [];
-      const quote = result?.indicators?.quote?.[0];
+      const now = new Date();
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setMonth(now.getMonth() - 3);
 
-      if (!timestamps.length || !quote?.close?.length) {
-        continue;
-      }
+      const result = await yahooFinance.historical(candidate, {
+        period1: threeMonthsAgo,
+        period2: now,
+        interval: '1d',
+      }) as any[];
 
-      const points: StockHistoryPoint[] = timestamps
-        .map((timestamp, index) => {
-          const open = quote.open?.[index];
-          const high = quote.high?.[index];
-          const low = quote.low?.[index];
-          const close = quote.close?.[index];
-          const volume = quote.volume?.[index];
+      if (!result || !result.length) continue;
 
-          if ([open, high, low, close].some((value) => typeof value !== "number")) {
-            return null;
-          }
-
-          return {
-            date: new Date(timestamp * 1000).toISOString().slice(0, 10),
-            open: Number(open),
-            high: Number(high),
-            low: Number(low),
-            close: Number(close),
-            volume: typeof volume === "number" ? Number(volume) : 0,
-          };
-        })
-        .filter((point): point is StockHistoryPoint => Boolean(point))
+      const points: StockHistoryPoint[] = result
+        .map(point => ({
+          date: new Date(point.date).toISOString().slice(0, 10),
+          open: Number(point.open),
+          high: Number(point.high),
+          low: Number(point.low),
+          close: Number(point.close),
+          volume: Number(point.volume || 0),
+        }))
+        .filter(p => !isNaN(p.close))
         .slice(-30);
 
       if (points.length) {
         return points;
       }
-    } catch {
+    } catch (e) {
+      console.error(`fetchYahooHistory failed for ${candidate}:`, e);
       continue;
     }
   }
