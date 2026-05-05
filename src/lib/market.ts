@@ -498,7 +498,7 @@ export async function fetchStockQuote(symbol: string, exchange?: string | null):
 
     const quote = data["Global Quote"];
     if (!quote?.["05. price"]) {
-      return null;
+      return fetchYahooQuote(symbol, exchange);
     }
 
     return {
@@ -570,7 +570,7 @@ export async function fetchStockHistory(symbol: string, exchange?: string | null
       | undefined;
 
     if (!timeSeries) {
-      return [];
+      return fetchYahooHistory(symbol, exchange);
     }
 
     return Object.entries(timeSeries)
