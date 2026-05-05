@@ -23,8 +23,7 @@ type AlphaVantageGoldSpot = {
   price?: string;
 };
 
-import YahooFinance from 'yahoo-finance2';
-const yahooFinance = new YahooFinance();
+import { fetchMLQuote, fetchMLHistory } from './ml';
 
 export interface LiveQuote {
   symbol: string;
@@ -455,26 +454,15 @@ async function fetchYahooQuote(symbol: string, exchange?: string | null): Promis
 
   for (const candidate of candidates) {
     try {
-      const quote = await yahooFinance.quote(candidate) as any;
-      if (!quote || typeof quote.regularMarketPrice !== "number") continue;
-
-      const previousClose = quote.regularMarketPreviousClose ?? quote.regularMarketPrice;
-      const change = quote.regularMarketChange ?? (quote.regularMarketPrice - previousClose);
-      const changePercent = quote.regularMarketChangePercent ?? (previousClose ? (change / previousClose) * 100 : 0);
+      const quote = await fetchMLQuote(candidate);
+      if (!quote) continue;
 
       return {
-        symbol: quote.symbol || candidate,
-        price: quote.regularMarketPrice,
-        previousClose,
-        change,
-        changePercent,
-        latestTradingDay: quote.regularMarketTime
-          ? new Date(quote.regularMarketTime).toISOString().slice(0, 10)
-          : new Date().toISOString().slice(0, 10),
-        source: "yahoo",
+        ...quote,
+        source: "yahoo-ml-proxy",
       };
     } catch (e) {
-      console.error(`fetchYahooQuote failed for ${candidate}:`, e);
+      console.error(`fetchMLQuote failed for ${candidate}:`, e);
       continue;
     }
   }
@@ -487,35 +475,13 @@ async function fetchYahooHistory(symbol: string, exchange?: string | null): Prom
 
   for (const candidate of candidates) {
     try {
-      const now = new Date();
-      const threeMonthsAgo = new Date();
-      threeMonthsAgo.setMonth(now.getMonth() - 3);
-
-      const result = await yahooFinance.historical(candidate, {
-        period1: threeMonthsAgo,
-        period2: now,
-        interval: '1d',
-      }) as any[];
+      const result = await fetchMLHistory(candidate);
 
       if (!result || !result.length) continue;
-
-      const points: StockHistoryPoint[] = result
-        .map(point => ({
-          date: new Date(point.date).toISOString().slice(0, 10),
-          open: Number(point.open),
-          high: Number(point.high),
-          low: Number(point.low),
-          close: Number(point.close),
-          volume: Number(point.volume || 0),
-        }))
-        .filter(p => !isNaN(p.close))
-        .slice(-30);
-
-      if (points.length) {
-        return points;
-      }
+      
+      return result;
     } catch (e) {
-      console.error(`fetchYahooHistory failed for ${candidate}:`, e);
+      console.error(`fetchMLHistory failed for ${candidate}:`, e);
       continue;
     }
   }

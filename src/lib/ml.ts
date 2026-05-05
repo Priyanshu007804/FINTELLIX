@@ -145,3 +145,41 @@ export async function predictStockPrice(symbol: string, days: number = 7): Promi
     return null;
   }
 }
+
+export async function fetchMLQuote(symbol: string) {
+  try {
+    const response = await fetch(`${ML_API_URL}/market/quote/${symbol}`, {
+      signal: AbortSignal.timeout(10000),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`ML API quote error: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("[ML] Market quote service unavailable:", error);
+    return null;
+  }
+}
+
+export async function fetchMLHistory(symbol: string) {
+  try {
+    const response = await fetch(`${ML_API_URL}/market/history/${symbol}`, {
+      signal: AbortSignal.timeout(15000),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      console.error(`ML API history error: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("[ML] Market history service unavailable:", error);
+    return null;
+  }
+}
