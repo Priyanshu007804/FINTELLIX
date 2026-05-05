@@ -18,6 +18,7 @@ import { auth } from "@/lib/auth";
 import { pusherServer } from "@/lib/pusher";
 import { and, desc, eq } from "drizzle-orm";
 import { headers } from "next/headers";
+import { predictStockPrice, type StockForecast } from "@/lib/ml";
 
 interface CreateStockHoldingInput {
   symbol: string;
@@ -305,5 +306,15 @@ export async function getStockDetail(holdingId: string) {
     return { success: true, data: detail };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+export async function getStockForecastAction(symbol: string, days: number = 7) {
+  try {
+    const result = await predictStockPrice(symbol, days);
+    return result;
+  } catch (error) {
+    console.error("Action error:", error);
+    return null;
   }
 }

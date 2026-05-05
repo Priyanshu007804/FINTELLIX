@@ -1,6 +1,6 @@
 "use client";
 
-import { getStockDashboardData, getStockDetail, type StockDashboardView, type StockDetailView } from "@/app/actions/stocks";
+import { getStockDashboardData, getStockDetail, getStockForecastAction, type StockDashboardView, type StockDetailView } from "@/app/actions/stocks";
 import { AddStockHoldingModal } from "@/components/dashboard/AddStockHoldingModal";
 import { Loader } from "@/components/ui/Loader";
 import { useSession } from "@/lib/auth-client";
@@ -46,6 +46,8 @@ export function StockMarketDetailsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [forecastData, setForecastData] = useState<{ date: string; forecast: number }[] | null>(null);
+  const [isForecasting, setIsForecasting] = useState(false);
 
   const primaryCurrency = useMemo(() => dashboard?.holdings[0]?.currency || "USD", [dashboard]);
 
@@ -76,11 +78,27 @@ export function StockMarketDetailsPage() {
   const loadDetail = async (holdingId: string) => {
     if (!holdingId) return;
     setIsDetailLoading(true);
+    setForecastData(null);
     const response = await getStockDetail(holdingId);
     if (response.success && response.data) {
       setDetail(response.data);
     }
     setIsDetailLoading(false);
+  };
+
+  const handleForecast = async () => {
+    if (!detail?.holding?.symbol) return;
+    setIsForecasting(true);
+    const result = await getStockForecastAction(detail.holding.symbol, 7);
+    if (result?.forecast) {
+      setForecastData(
+        result.forecast.map((f) => ({
+          date: new Date(f.date).toLocaleDateString("en-IN", { month: "short", day: "numeric" }),
+          forecast: f.price,
+        }))
+      );
+    }
+    setIsForecasting(false);
   };
 
   useEffect(() => {
@@ -118,11 +136,21 @@ export function StockMarketDetailsPage() {
     return (detail?.history || []).map((point) => ({
       date: new Date(point.date).toLocaleDateString("en-IN", { month: "short", day: "numeric" }),
       close: point.close,
+      historical: point.close,
       volume: point.volume,
       high: point.high,
       low: point.low,
     }));
   }, [detail]);
+
+  const chartData = useMemo(() => {
+    const base = [...historyData];
+    if (forecastData && base.length > 0) {
+      const lastPoint = base[base.length - 1];
+      return [...base, { ...lastPoint, forecast: lastPoint.historical }, ...forecastData];
+    }
+    return base;
+  }, [historyData, forecastData]);
 
   if (isPending || isLoading) {
     return <Loader fullScreen text="LOADING MARKET STUDIO" />;
@@ -347,7 +375,21 @@ export function StockMarketDetailsPage() {
                 <h2 className="text-lg font-semibold">Single Stock Deep Dive</h2>
                 <p className="mt-1 text-sm text-slate-400">Choose a holding lot to inspect its recent price trend and current position metrics.</p>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-4">
+                {detail?.holding && (
+                  <button
+                    onClick={handleForecast}
+                    disabled={isForecasting}
+                    className="flex items-center gap-2 rounded-lg bg-purple-500/20 px-3 py-1.5 text-sm font-semibold text-purple-300 transition hover:bg-purple-500/30 disabled:opacity-50"
+                  >
+                    {isForecasting ? (
+                      <span className="flex items-center gap-2"><div className="h-4 w-4 animate-spin rounded-full border-2 border-purple-400 border-t-transparent" /> Analyzing...</span>
+                    ) : (
+                      "✨ AI Forecast (7 Days)"
+                    )}
+                  </button>
+                )}
+                <div className="flex flex-wrap gap-2">
                 {(dashboard?.holdings || []).map((holding) => (
                   <button
                     key={holding.id}
@@ -364,6 +406,7 @@ export function StockMarketDetailsPage() {
                     {holding.symbol} • {new Date(holding.purchaseDate).toLocaleDateString("en-IN", { month: "short", year: "2-digit" })}
                   </button>
                 ))}
+              </div>
               </div>
             </div>
 
@@ -416,15 +459,16 @@ export function StockMarketDetailsPage() {
                   </div>
                   <div className="mt-5 h-[320px] w-full min-h-[1px] min-w-[1px]">
                     <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                      <LineChart data={historyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
                         <XAxis dataKey="date" tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
                         <Tooltip
-                          formatter={(value) => formatTooltipMoney(value, detail.holding?.currency || "USD")}
+                          formatter={(value, name) => [formatTooltipMoney(value, detail.holding?.currency || "USD"), name === "forecast" ? "Forecast" : "Close"]}
                           contentStyle={{ backgroundColor: "#1e293b", borderColor: "#334155", borderRadius: "10px" }}
                         />
-                        <Line type="monotone" dataKey="close" stroke="#22d3ee" strokeWidth={3} dot={false} />
+                        <Line type="monotone" dataKey="historical" stroke="#22d3ee" strokeWidth={3} dot={false} />
+                        <Line type="monotone" dataKey="forecast" stroke="#a855f7" strokeWidth={3} strokeDasharray="5 5" dot={false} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -438,7 +482,7 @@ export function StockMarketDetailsPage() {
                   )}
                   <div className="mt-5 h-[320px] w-full min-h-[1px] min-w-[1px]">
                     <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
-                      <AreaChart data={historyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <defs>
                           <linearGradient id="stockCloseGradient" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#6366f1" stopOpacity={0.45} />
@@ -447,16 +491,17 @@ export function StockMarketDetailsPage() {
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
                         <XAxis dataKey="date" tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fill: "#94a3b8", fontSize: 12 }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
                         <Tooltip
                           formatter={(value, name) =>
                             String(name) === "volume"
                               ? [Number(value).toLocaleString("en-IN"), "Volume"]
-                              : [formatTooltipMoney(value, detail.holding?.currency || "USD"), "Close"]
+                              : [formatTooltipMoney(value, detail.holding?.currency || "USD"), name === "forecast" ? "Forecast" : "Close"]
                           }
                           contentStyle={{ backgroundColor: "#1e293b", borderColor: "#334155", borderRadius: "10px" }}
                         />
-                        <Area type="monotone" dataKey="close" stroke="#818cf8" fill="url(#stockCloseGradient)" strokeWidth={2.5} />
+                        <Area type="monotone" dataKey="historical" stroke="#818cf8" fill="url(#stockCloseGradient)" strokeWidth={2.5} />
+                        <Area type="monotone" dataKey="forecast" stroke="#a855f7" fill="transparent" strokeWidth={2.5} strokeDasharray="5 5" />
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>

@@ -115,3 +115,33 @@ export async function checkMLHealth(): Promise<boolean> {
     return false;
   }
 }
+
+export interface StockForecast {
+  symbol: string;
+  forecast: { date: string; price: number }[];
+  processing_time_ms: number;
+}
+
+/**
+ * Call the ML API to generate an AI stock forecast.
+ */
+export async function predictStockPrice(symbol: string, days: number = 7): Promise<StockForecast | null> {
+  try {
+    const response = await fetch(`${ML_API_URL}/predict/stock`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbol, days }),
+      signal: AbortSignal.timeout(30000), // Stock training can take a few seconds
+    });
+
+    if (!response.ok) {
+      console.error(`ML API error: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("[ML] Stock prediction service unavailable:", error);
+    return null;
+  }
+}
