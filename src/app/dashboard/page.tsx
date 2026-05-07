@@ -2,11 +2,11 @@
 
 import { useSession, signOut } from "@/lib/auth-client";
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 
 import { getTransactions } from "@/app/actions/transactions";
-import { getCategories, createCategory } from "@/app/actions/categories";
+import { getCategories, createCategory, deleteDuplicateCategories } from "@/app/actions/categories";
 import { getBudgets } from "@/app/actions/budgets";
 import { getStockDashboardData, type StockDashboardView } from "@/app/actions/stocks";
 import { TransactionsTable } from "@/components/ui/TransactionsTable";
@@ -32,6 +32,7 @@ export default function DashboardPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [fraudAlert, setFraudAlert] = useState<any>(null);
   const [stockDashboard, setStockDashboard] = useState<StockDashboardView | null>(null);
+  const seedingRef = useRef(false);
 
   const loadData = async () => {
     setIsLoadingData(true);
@@ -45,7 +46,13 @@ export default function DashboardPage() {
 
       if (catRes.success) {
         let fetchedCategories = catRes.data || [];
-        const defaultCategories = [
+        
+        if (!seedingRef.current) {
+          seedingRef.current = true;
+          // First, clean up any existing duplicates
+          await deleteDuplicateCategories();
+          
+          const defaultCategories = [
           { name: "Food & Dining", color: "#fbbf24" },
           { name: "Shopping", color: "#a78bfa" },
           { name: "Travel", color: "#34d399" },
@@ -72,13 +79,14 @@ export default function DashboardPage() {
            }
         }
         
-        if (addedNew) {
-           const refreshedCats = await getCategories();
-           if (refreshedCats.success) {
-               fetchedCategories = refreshedCats.data || [];
-           }
         }
-        setCategories(fetchedCategories);
+        
+        // Refresh categories list after cleanup/seeding
+        const finalCats = await getCategories();
+        if (finalCats.success) {
+          setCategories(finalCats.data || []);
+        }
+        seedingRef.current = false;
       }
       
       if (txRes.success && txRes.data) {

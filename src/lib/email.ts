@@ -27,7 +27,7 @@ export async function sendFraudAlertEmail(
   const probStr = (transactionDetails.fraudProbability * 100).toFixed(1) + "%";
 
   const htmlContent = `
-    <div style="font-family: Arial, sans-serif; max-w-md; margin: auto; border: 1px solid #1e293b; background-color: #020617; color: #f8fafc; padding: 24px; border-radius: 12px;">
+    <div style="font-family: Arial, sans-serif; max-width: 28rem; margin: auto; border: 1px solid #1e293b; background-color: #020617; color: #f8fafc; padding: 24px; border-radius: 12px;">
       <h2 style="color: #ef4444; margin-top: 0;">🚨 Fintellix Security Alert</h2>
       <p style="font-size: 16px;">We detected a suspicious transaction on your account. Our advanced ML model flagged this activity with a <strong>${probStr}</strong> confidence score.</p>
       
