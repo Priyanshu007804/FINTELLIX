@@ -1,7 +1,6 @@
 "use client";
 
 import { useSession, signOut } from "@/lib/auth-client";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import Image from "next/image";
@@ -24,8 +23,6 @@ import { AskAI } from "@/components/dashboard/AskAI";
 
 export default function DashboardPage() {
   const { data: session, isPending } = useSession();
-  const router = useRouter();
-
   const [transactions, setTransactions] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [budgetsList, setBudgetsList] = useState<any[]>([]);
@@ -131,13 +128,8 @@ export default function DashboardPage() {
   }, [transactions, fraudAlert]);
 
   const handleSignout = async () => {
-    await signOut({
-      fetchOptions: {
-        onSuccess: () => {
-           router.push("/login");
-        }
-      }
-    });
+    await signOut();
+    window.location.href = "/login";
   };
 
   if (isPending || isLoadingData) {
