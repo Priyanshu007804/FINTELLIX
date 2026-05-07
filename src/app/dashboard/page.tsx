@@ -150,6 +150,7 @@ export default function DashboardPage() {
         }
         console.log("Real-time update received:", data);
         loadData(); // silent background refresh
+        if (data?.type === "stock") loadStocks(); // also refresh stocks
       });
     });
 
