@@ -45,21 +45,37 @@ export default function DashboardPage() {
 
       if (catRes.success) {
         let fetchedCategories = catRes.data || [];
-        // Auto-seed some categories if user has none
-        if (fetchedCategories.length === 0) {
-           await createCategory("Food & Dining", "#fbbf24"); // Amber
-           await createCategory("Shopping", "#a78bfa");      // Purple
-           await createCategory("Travel", "#34d399");        // Emerald
-           await createCategory("Housing", "#60a5fa");       // Blue
-           await createCategory("Transportation", "#f87171");// Red
-           await createCategory("Utilities", "#fb923c");     // Orange
-           await createCategory("Entertainment", "#f472b6"); // Pink
-           await createCategory("Healthcare", "#2dd4bf");    // Teal
-           await createCategory("Salary", "#4ade80");        // Green (Income)
-           await createCategory("Transfer", "#94a3b8");      // Slate
+        const defaultCategories = [
+          { name: "Food & Dining", color: "#fbbf24" },
+          { name: "Shopping", color: "#a78bfa" },
+          { name: "Travel", color: "#34d399" },
+          { name: "Housing", color: "#60a5fa" },
+          { name: "Transportation", color: "#f87171" },
+          { name: "Utilities", color: "#fb923c" },
+          { name: "Entertainment", color: "#f472b6" },
+          { name: "Healthcare", color: "#2dd4bf" },
+          { name: "Medical", color: "#ef4444" },
+          { name: "Education", color: "#8b5cf6" },
+          { name: "Groceries", color: "#10b981" },
+          { name: "Investment", color: "#f59e0b" },
+          { name: "Personal Care", color: "#ec4899" },
+          { name: "Subscriptions", color: "#6366f1" },
+          { name: "Salary", color: "#4ade80" },
+          { name: "Transfer", color: "#94a3b8" }
+        ];
+
+        let addedNew = false;
+        for (const defaultCat of defaultCategories) {
+           if (!fetchedCategories.some((c: any) => c.name === defaultCat.name)) {
+               await createCategory(defaultCat.name, defaultCat.color);
+               addedNew = true;
+           }
+        }
+        
+        if (addedNew) {
            const refreshedCats = await getCategories();
            if (refreshedCats.success) {
-              fetchedCategories = refreshedCats.data!;
+               fetchedCategories = refreshedCats.data || [];
            }
         }
         setCategories(fetchedCategories);
