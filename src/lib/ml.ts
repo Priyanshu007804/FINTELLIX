@@ -131,7 +131,7 @@ export async function predictStockPrice(symbol: string, days: number = 7): Promi
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ symbol, days }),
-      signal: AbortSignal.timeout(30000), // Stock training can take a few seconds
+      signal: AbortSignal.timeout(60000), // Stock training can take a few seconds, especially on cold starts
     });
 
     if (!response.ok) {
