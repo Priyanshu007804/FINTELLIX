@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 
 import { getTransactions } from "@/app/actions/transactions";
-import { getCategories, createCategory, deleteDuplicateCategories } from "@/app/actions/categories";
+import { getCategories, createCategory, deleteDuplicateCategories, createCategories } from "@/app/actions/categories";
 import { getBudgets } from "@/app/actions/budgets";
 import { getStockDashboardData, type StockDashboardView } from "@/app/actions/stocks";
 import { TransactionsTable } from "@/components/ui/TransactionsTable";
@@ -42,7 +42,13 @@ export default function DashboardPage() {
         getCategories(),
         getBudgets(),
       ]);
-      const stockRes = await getStockDashboardData();
+
+      // Load stocks in parallel without blocking the main dashboard render
+      getStockDashboardData().then(stockRes => {
+        if (stockRes.success && stockRes.data) {
+          setStockDashboard(stockRes.data);
+        }
+      }).catch(console.error);
 
       if (catRes.success) {
         let fetchedCategories = catRes.data || [];
@@ -71,13 +77,13 @@ export default function DashboardPage() {
           { name: "Transfer", color: "#94a3b8" }
         ];
 
-        let addedNew = false;
-        for (const defaultCat of defaultCategories) {
-           if (!fetchedCategories.some((c: any) => c.name === defaultCat.name)) {
-               await createCategory(defaultCat.name, defaultCat.color);
-               addedNew = true;
-           }
-        }
+          const missingCategories = defaultCategories.filter(
+            defaultCat => !fetchedCategories.some((c: any) => c.name === defaultCat.name)
+          );
+
+          if (missingCategories.length > 0) {
+             await createCategories(missingCategories);
+          }
         
         }
         
@@ -94,9 +100,6 @@ export default function DashboardPage() {
       }
       if (budgetRes.success && budgetRes.data) {
         setBudgetsList(budgetRes.data);
-      }
-      if (stockRes.success && stockRes.data) {
-        setStockDashboard(stockRes.data);
       }
     } catch (e) {
       console.error(e);

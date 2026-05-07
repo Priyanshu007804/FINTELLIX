@@ -93,52 +93,47 @@ export async function createTransaction(input: AddTransactionInput) {
       userId,
     }).returning();
 
-    // Step 2: Call ML Fraud Detection API (non-blocking — don't fail if ML is down)
-    const mlResult = await predictFraud(
-      input.amount,
-      new Date(input.date),
-      input.merchant,
-      input.location,
-    );
+    // Step 2: Call ML Fraud Detection API in the background (non-blocking)
+    // This makes the UI feel instant while analysis runs in the background
+    (async () => {
+      try {
+        const mlResult = await predictFraud(
+          input.amount,
+          new Date(input.date),
+          input.merchant,
+          input.location,
+        );
 
-    if (mlResult) {
-      // Step 3: Update the transaction with fraud analysis results
-      await db.update(transactions)
-        .set({
-          isFraud: mlResult.prediction === 1,
-          fraudProbability: mlResult.fraud_probability.toString(),
-          updatedAt: new Date(),
-        })
-        .where(eq(transactions.id, newTransaction.id));
+        if (mlResult) {
+          // Step 3: Update the transaction with fraud analysis results
+          await db.update(transactions)
+            .set({
+              isFraud: mlResult.prediction === 1,
+              fraudProbability: mlResult.fraud_probability.toString(),
+              updatedAt: new Date(),
+            })
+            .where(eq(transactions.id, newTransaction.id));
 
-      // Trigger pusher event
-      pusherServer.trigger(`user-${userId}`, "update_data", { type: "transaction" }).catch(console.error);
+          // Trigger pusher event so the UI updates automatically
+          pusherServer.trigger(`user-${userId}`, "update_data", { type: "transaction" }).catch(console.error);
 
-      // Phase 9: Trigger Email Notification
-      if (mlResult.prediction === 1 && email) {
-        sendFraudAlertEmail(email, {
-          merchant: input.merchant || "Unknown",
-          amount: input.amount,
-          date: new Date(input.date),
-          fraudProbability: mlResult.fraud_probability,
-          location: input.location,
-        }).catch(console.error); // Non-blocking
+          // Trigger Email Notification
+          if (mlResult.prediction === 1 && email) {
+            sendFraudAlertEmail(email, {
+              merchant: input.merchant || "Unknown",
+              amount: input.amount,
+              date: new Date(input.date),
+              fraudProbability: mlResult.fraud_probability,
+              location: input.location,
+            }).catch(console.error);
+          }
+        }
+      } catch (e) {
+        console.error("[Background ML Error]", e);
       }
+    })();
 
-      return {
-        success: true,
-        data: {
-          ...newTransaction,
-          isFraud: mlResult.prediction === 1,
-          fraudProbability: mlResult.fraud_probability,
-          mlLabel: mlResult.label,
-        },
-      };
-    }
-    
-    // Trigger pusher event
-    pusherServer.trigger(`user-${userId}`, "update_data", { type: "transaction" }).catch(console.error);
-
+    // Return the new transaction immediately
     return { success: true, data: newTransaction };
   } catch (error: any) {
     return { success: false, error: error.message };

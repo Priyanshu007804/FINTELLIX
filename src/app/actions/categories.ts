@@ -32,6 +32,26 @@ export async function getCategories() {
   }
 }
 
+export async function createCategories(data: { name: string, color: string }[]) {
+  try {
+    const userId = await getUserId();
+    
+    const newCategories = await db.insert(categories).values(
+      data.map(cat => ({
+        name: cat.name,
+        color: cat.color,
+        userId,
+      }))
+    ).returning();
+    
+    pusherServer.trigger(`user-${userId}`, "update_data", { type: "category" }).catch(console.error);
+
+    return { success: true, data: newCategories };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 export async function createCategory(name: string, color: string) {
   try {
     const userId = await getUserId();
