@@ -229,16 +229,16 @@ export async function createStockHolding(input: CreateStockHoldingInput) {
 export async function deleteStockHolding(holdingId: string) {
   try {
     const userId = await getUserId();
-    const [holding] = await db
-      .select()
-      .from(stockHoldings)
-      .where(and(eq(stockHoldings.id, holdingId), eq(stockHoldings.userId, userId)));
+    
+    // Efficient single-query delete with ownership check
+    const result = await db.delete(stockHoldings)
+      .where(and(eq(stockHoldings.id, holdingId), eq(stockHoldings.userId, userId)))
+      .returning();
 
-    if (!holding) {
-      return { success: false, error: "Holding not found" };
+    if (result.length === 0) {
+      return { success: false, error: "Holding not found or unauthorized" };
     }
 
-    await db.delete(stockHoldings).where(eq(stockHoldings.id, holdingId));
     pusherServer.trigger(`user-${userId}`, "update_data", { type: "stock" }).catch(console.error);
 
     return { success: true };

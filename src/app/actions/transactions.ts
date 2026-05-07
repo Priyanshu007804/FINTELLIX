@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { transactions, categories } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { ratelimit } from "@/lib/ratelimit";
@@ -144,15 +144,16 @@ export async function deleteTransaction(transactionId: string) {
   try {
     const { id: userId } = await getUser();
     
-    // Validate ownership before deleting
-    const [tx] = await db.select().from(transactions).where(eq(transactions.id, transactionId));
-    if (!tx || tx.userId !== userId) {
+    // Efficient single-query delete with ownership check
+    const result = await db.delete(transactions)
+      .where(and(eq(transactions.id, transactionId), eq(transactions.userId, userId)))
+      .returning();
+
+    if (result.length === 0) {
       return { success: false, error: "Unauthorized or transaction not found" };
     }
-
-    await db.delete(transactions).where(eq(transactions.id, transactionId));
     
-    // Trigger pusher event
+    // Trigger pusher event in the background
     pusherServer.trigger(`user-${userId}`, "update_data", { type: "transaction" }).catch(console.error);
 
     return { success: true };
