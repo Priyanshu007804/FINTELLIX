@@ -2,7 +2,7 @@
 
 import { useSession, signOut } from "@/lib/auth-client";
 import { motion } from "framer-motion";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 
 import { getTransactions } from "@/app/actions/transactions";
@@ -32,10 +32,18 @@ export default function DashboardPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [fraudAlert, setFraudAlert] = useState<any>(null);
   const [stockDashboard, setStockDashboard] = useState<StockDashboardView | null>(null);
-  const seedingRef = useRef(false);
 
-  const loadData = async () => {
-    setIsLoadingData(true);
+  // Refs for controlling load behaviour
+  const seedingDoneRef = useRef(false);
+  const initialLoadDoneRef = useRef(false);
+  const lastLocalMutationRef = useRef(0); // timestamp of last local add/delete
+
+  /**
+   * Core data loader — only shows the full-screen spinner on first load.
+   * Subsequent calls (from Pusher, budget updates, etc.) refresh silently.
+   */
+  const loadData = useCallback(async (opts?: { showLoader?: boolean }) => {
+    if (opts?.showLoader) setIsLoadingData(true);
     try {
       const [txRes, catRes, budgetRes] = await Promise.all([
         getTransactions(),
@@ -43,79 +51,79 @@ export default function DashboardPage() {
         getBudgets(),
       ]);
 
-      // Load stocks in parallel without blocking the main dashboard render
-      getStockDashboardData().then(stockRes => {
-        if (stockRes.success && stockRes.data) {
-          setStockDashboard(stockRes.data);
-        }
-      }).catch(console.error);
-
-      if (catRes.success) {
-        let fetchedCategories = catRes.data || [];
-        
-        if (!seedingRef.current) {
-          seedingRef.current = true;
-          // First, clean up any existing duplicates
-          await deleteDuplicateCategories();
-          
-          const defaultCategories = [
-          { name: "Food & Dining", color: "#fbbf24" },
-          { name: "Shopping", color: "#a78bfa" },
-          { name: "Travel", color: "#34d399" },
-          { name: "Housing", color: "#60a5fa" },
-          { name: "Transportation", color: "#f87171" },
-          { name: "Utilities", color: "#fb923c" },
-          { name: "Entertainment", color: "#f472b6" },
-          { name: "Healthcare", color: "#2dd4bf" },
-          { name: "Medical", color: "#ef4444" },
-          { name: "Education", color: "#8b5cf6" },
-          { name: "Groceries", color: "#10b981" },
-          { name: "Investment", color: "#f59e0b" },
-          { name: "Personal Care", color: "#ec4899" },
-          { name: "Subscriptions", color: "#6366f1" },
-          { name: "Salary", color: "#4ade80" },
-          { name: "Transfer", color: "#94a3b8" }
-        ];
-
-          const missingCategories = defaultCategories.filter(
-            defaultCat => !fetchedCategories.some((c: any) => c.name === defaultCat.name)
-          );
-
-          if (missingCategories.length > 0) {
-             await createCategories(missingCategories);
-          }
-        
-        }
-        
-        // Refresh categories list after cleanup/seeding
-        const finalCats = await getCategories();
-        if (finalCats.success) {
-          setCategories(finalCats.data || []);
-        }
-        seedingRef.current = false;
-      }
-      
-      if (txRes.success && txRes.data) {
-        setTransactions(txRes.data);
-      }
-      if (budgetRes.success && budgetRes.data) {
-        setBudgetsList(budgetRes.data);
-      }
+      if (catRes.success) setCategories(catRes.data || []);
+      if (txRes.success && txRes.data) setTransactions(txRes.data);
+      if (budgetRes.success && budgetRes.data) setBudgetsList(budgetRes.data);
     } catch (e) {
       console.error(e);
     } finally {
       setIsLoadingData(false);
+      initialLoadDoneRef.current = true;
     }
-  };
+  }, []);
 
+  /** Load stock data independently — never blocks the main dashboard */
+  const loadStocks = useCallback(async () => {
+    try {
+      const stockRes = await getStockDashboardData();
+      if (stockRes.success && stockRes.data) {
+        setStockDashboard(stockRes.data);
+      }
+    } catch (e) {
+      console.error("[Stocks]", e);
+    }
+  }, []);
+
+  // ── Initial data load ──
   useEffect(() => {
-    // Only load if bounded to session fetch success
     if (!isPending && session?.user?.id) {
-       loadData();
+      loadData({ showLoader: true });
+      loadStocks(); // Fire stocks in parallel, fully independent
     }
   }, [isPending, session?.user?.id]);
 
-  // Real-time synchronization
+  // ── One-time category seeding (runs once per session, not every loadData) ──
+  useEffect(() => {
+    if (categories.length === 0 || seedingDoneRef.current) return;
+    seedingDoneRef.current = true;
+
+    const seedDefaults = async () => {
+      const defaultCategories = [
+        { name: "Food & Dining", color: "#fbbf24" },
+        { name: "Shopping", color: "#a78bfa" },
+        { name: "Travel", color: "#34d399" },
+        { name: "Housing", color: "#60a5fa" },
+        { name: "Transportation", color: "#f87171" },
+        { name: "Utilities", color: "#fb923c" },
+        { name: "Entertainment", color: "#f472b6" },
+        { name: "Healthcare", color: "#2dd4bf" },
+        { name: "Medical", color: "#ef4444" },
+        { name: "Education", color: "#8b5cf6" },
+        { name: "Groceries", color: "#10b981" },
+        { name: "Investment", color: "#f59e0b" },
+        { name: "Personal Care", color: "#ec4899" },
+        { name: "Subscriptions", color: "#6366f1" },
+        { name: "Salary", color: "#4ade80" },
+        { name: "Transfer", color: "#94a3b8" },
+      ];
+
+      const missingCategories = defaultCategories.filter(
+        (defaultCat) => !categories.some((c: any) => c.name === defaultCat.name)
+      );
+
+      if (missingCategories.length > 0) {
+        await deleteDuplicateCategories();
+        await createCategories(missingCategories);
+        // Refresh categories after seeding
+        const finalCats = await getCategories();
+        if (finalCats.success) setCategories(finalCats.data || []);
+      }
+    };
+
+    seedDefaults().catch(console.error);
+  }, [categories]);
+
+  // ── Real-time synchronization (Pusher) with debounce ──
   useEffect(() => {
     if (!session?.user?.id) return;
 
@@ -134,8 +142,14 @@ export default function DashboardPage() {
       const channel = pusher.subscribe(channelName);
 
       channel.bind("update_data", (data: any) => {
+        // Skip Pusher echo if we just did a local mutation (within 3 seconds)
+        const timeSinceLocal = Date.now() - lastLocalMutationRef.current;
+        if (timeSinceLocal < 3000) {
+          console.log("[Pusher] Skipping echo — local mutation was recent");
+          return;
+        }
         console.log("Real-time update received:", data);
-        loadData();
+        loadData(); // silent background refresh
       });
     });
 
@@ -153,6 +167,53 @@ export default function DashboardPage() {
       setFraudAlert(null);
     }
   }, [transactions, fraudAlert]);
+
+  // ── Optimistic handlers ──
+
+  /** Optimistically remove a transaction from local state */
+  const handleOptimisticDelete = useCallback((txId: string) => {
+    lastLocalMutationRef.current = Date.now();
+    setTransactions(prev => prev.filter(tx => tx.id !== txId));
+  }, []);
+
+  /** Optimistically add a new transaction to local state */
+  const handleOptimisticAdd = useCallback((newTx: any) => {
+    lastLocalMutationRef.current = Date.now();
+    if (newTx) {
+      setTransactions(prev => [newTx, ...prev]);
+    }
+  }, []);
+
+  /** Optimistically remove a stock holding */
+  const handleOptimisticStockDelete = useCallback((holdingId: string) => {
+    lastLocalMutationRef.current = Date.now();
+    setStockDashboard(prev => {
+      if (!prev) return prev;
+      const updated = prev.holdings.filter(h => h.id !== holdingId);
+      const totalInvested = updated.reduce((sum, h) => sum + h.investedAmount, 0);
+      const currentValue = updated.reduce((sum, h) => sum + (h.currentValue ?? 0), 0);
+      const totalDayChange = updated.reduce((sum, h) => sum + (h.dayChange ?? 0), 0);
+      const totalGainLoss = currentValue - totalInvested;
+      return {
+        ...prev,
+        holdings: updated,
+        summary: {
+          totalInvested,
+          currentValue,
+          totalGainLoss,
+          totalGainLossPercent: totalInvested > 0 ? (totalGainLoss / totalInvested) * 100 : 0,
+          totalDayChange,
+        },
+      };
+    });
+  }, []);
+
+  /** Lightweight refresh for budget updates — no full-screen loader */
+  const handleBudgetUpdate = useCallback(async () => {
+    lastLocalMutationRef.current = Date.now();
+    const budgetRes = await getBudgets();
+    if (budgetRes.success && budgetRes.data) setBudgetsList(budgetRes.data);
+  }, []);
 
   const handleSignout = async () => {
     await signOut();
@@ -240,10 +301,10 @@ export default function DashboardPage() {
         </div>
 
         <div className="mb-8">
-           <BudgetTracker categories={categories} budgets={budgetsList} transactions={transactions} onUpdate={loadData} />
+           <BudgetTracker categories={categories} budgets={budgetsList} transactions={transactions} onUpdate={handleBudgetUpdate} />
         </div>
 
-        <StocksSection data={stockDashboard} onRefresh={loadData} />
+        <StocksSection data={stockDashboard} onRefresh={loadStocks} onOptimisticDelete={handleOptimisticStockDelete} />
 
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
            <h2 className="text-xl font-semibold">Transaction History</h2>
@@ -295,7 +356,7 @@ export default function DashboardPage() {
           </p>
         )}
 
-        <TransactionsTable transactions={filteredTransactions} onRefresh={loadData} />
+        <TransactionsTable transactions={filteredTransactions} onRefresh={loadData} onOptimisticDelete={handleOptimisticDelete} />
 
       </motion.div>
 
@@ -304,7 +365,7 @@ export default function DashboardPage() {
         onClose={() => setIsModalOpen(false)} 
         categories={categories}
         onSuccess={(txData?: any) => {
-          loadData();
+          handleOptimisticAdd(txData);
           // Show fraud alert if ML flagged this transaction
           if (txData?.isFraud) {
             setFraudAlert(txData);

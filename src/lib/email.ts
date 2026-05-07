@@ -13,7 +13,7 @@ export async function sendFraudAlertEmail(
   }
 ) {
   if (!process.env.RESEND_API_KEY) {
-    console.warn("RESEND_API_KEY is not configured.");
+    console.warn("[Email] RESEND_API_KEY is not configured — skipping fraud alert email.");
     return false;
   }
 
@@ -44,17 +44,30 @@ export async function sendFraudAlertEmail(
   `;
 
   try {
-    const data = await resend.emails.send({
+    const { data, error } = await resend.emails.send({
       from: "Fintellix Security <onboarding@resend.dev>",
-      to: toEmail, // Note: On free tier, this MUST match the Resend account email!
+      to: toEmail,
       subject: `🚨 Fraud Alert: Suspicious transaction of ${amountStr}`,
       html: htmlContent,
     });
+
+    if (error) {
+      // Resend free tier only allows sending to the account owner's email.
+      // Any other recipient will be rejected with a validation error.
+      console.error(
+        `[Email] Resend API rejected the email to ${toEmail}:`,
+        error.message || JSON.stringify(error),
+        "\n[Email] NOTE: On the Resend free tier, emails can ONLY be sent to the account owner's email address.",
+        "To send to other users, verify a custom domain at https://resend.com/domains"
+      );
+      return false;
+    }
     
-    console.log("Resend Email Sent:", data);
+    console.log(`[Email] Fraud alert sent successfully to ${toEmail}. ID: ${data?.id}`);
     return true;
   } catch (error) {
-    console.error("Failed to send fraud alert email:", error);
+    console.error("[Email] Failed to send fraud alert email:", error);
     return false;
   }
 }
+

@@ -48,6 +48,7 @@ export function StockMarketDetailsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [forecastData, setForecastData] = useState<{ date: string; forecast: number }[] | null>(null);
   const [isForecasting, setIsForecasting] = useState(false);
+  const [forecastError, setForecastError] = useState<string | null>(null);
 
   const primaryCurrency = useMemo(() => dashboard?.holdings[0]?.currency || "USD", [dashboard]);
 
@@ -79,6 +80,7 @@ export function StockMarketDetailsPage() {
     if (!holdingId) return;
     setIsDetailLoading(true);
     setForecastData(null);
+    setForecastError(null);
     const response = await getStockDetail(holdingId);
     if (response.success && response.data) {
       setDetail(response.data);
@@ -89,6 +91,7 @@ export function StockMarketDetailsPage() {
   const handleForecast = async () => {
     if (!detail?.holding?.symbol) return;
     setIsForecasting(true);
+    setForecastError(null);
     const result = await getStockForecastAction(detail.holding.symbol, 7);
     if (result?.forecast) {
       setForecastData(
@@ -97,6 +100,8 @@ export function StockMarketDetailsPage() {
           forecast: f.price,
         }))
       );
+    } else {
+      setForecastError("Forecast unavailable — the ML model could not retrieve enough data for this symbol. Try again in a moment.");
     }
     setIsForecasting(false);
   };
@@ -409,6 +414,12 @@ export function StockMarketDetailsPage() {
               </div>
               </div>
             </div>
+
+            {forecastError && (
+              <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+                {forecastError}
+              </div>
+            )}
 
             {isDetailLoading ? (
               <div className="py-12">

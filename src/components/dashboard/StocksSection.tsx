@@ -9,6 +9,7 @@ import { AddStockHoldingModal } from "./AddStockHoldingModal";
 interface Props {
   data: StockDashboardView | null;
   onRefresh: () => void;
+  onOptimisticDelete?: (holdingId: string) => void;
 }
 
 function formatMoney(value: number, currency: string) {
@@ -19,7 +20,7 @@ function formatMoney(value: number, currency: string) {
   }).format(value);
 }
 
-export function StocksSection({ data, onRefresh }: Props) {
+export function StocksSection({ data, onRefresh, onOptimisticDelete }: Props) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -32,10 +33,14 @@ export function StocksSection({ data, onRefresh }: Props) {
   );
 
   const handleDelete = async (holdingId: string) => {
-    setDeletingId(holdingId);
-    await deleteStockHolding(holdingId);
+    // Optimistic: remove row instantly from UI
+    onOptimisticDelete?.(holdingId);
     setDeletingId(null);
-    onRefresh();
+    // Then run the actual delete in the background
+    const res = await deleteStockHolding(holdingId);
+    if (!res.success) {
+      onRefresh(); // revert on failure
+    }
   };
 
   return (

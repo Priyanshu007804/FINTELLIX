@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { deleteTransaction, scanTransaction } from "@/app/actions/transactions";
 import { MoreVertical, Trash2, ScanSearch } from "lucide-react";
 
-export function TransactionsTable({ transactions, onRefresh }: { transactions: any[], onRefresh?: () => void }) {
+export function TransactionsTable({ transactions, onRefresh, onOptimisticDelete }: { transactions: any[], onRefresh?: () => void, onOptimisticDelete?: (id: string) => void }) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -21,15 +21,15 @@ export function TransactionsTable({ transactions, onRefresh }: { transactions: a
   }, []);
 
   const handleDelete = async (id: string) => {
-    setIsProcessing(id);
-    const res = await deleteTransaction(id);
-    if (res.success) {
-       onRefresh?.();
-    } else {
-       alert("Failed to delete: " + res.error);
-    }
-    setIsProcessing(null);
+    // Optimistic: remove row instantly from UI
+    onOptimisticDelete?.(id);
     setOpenMenuId(null);
+    // Then run the actual delete in the background
+    const res = await deleteTransaction(id);
+    if (!res.success) {
+      alert("Failed to delete: " + res.error);
+      onRefresh?.(); // revert by reloading if delete failed
+    }
   };
 
   const handleScan = async (id: string) => {

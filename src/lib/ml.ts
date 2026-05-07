@@ -11,6 +11,18 @@
 
 const ML_API_URL = process.env.ML_API_URL || "https://fintellix-ml-model.onrender.com";
 
+/**
+ * Normalize stock symbols for yfinance compatibility.
+ * Yahoo Finance uses .NS for NSE and .BO for BSE, but users
+ * often enter .NSE / .BSE which yfinance doesn't recognize.
+ */
+function normalizeSymbolForYFinance(symbol: string): string {
+  const s = symbol.trim().toUpperCase();
+  if (s.endsWith(".NSE")) return s.replace(/\.NSE$/i, ".NS");
+  if (s.endsWith(".BSE")) return s.replace(/\.BSE$/i, ".BO");
+  return s;
+}
+
 interface MLPrediction {
   prediction: number;      // 0 = Normal, 1 = Fraud
   label: string;           // "Normal" or "Fraud"
@@ -126,11 +138,12 @@ export interface StockForecast {
  * Call the ML API to generate an AI stock forecast.
  */
 export async function predictStockPrice(symbol: string, days: number = 7): Promise<StockForecast | null> {
+  const normalizedSymbol = normalizeSymbolForYFinance(symbol);
   try {
     const response = await fetch(`${ML_API_URL}/predict/stock`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbol, days }),
+      body: JSON.stringify({ symbol: normalizedSymbol, days }),
       signal: AbortSignal.timeout(60000), // Stock training can take a few seconds, especially on cold starts
     });
 
@@ -147,8 +160,9 @@ export async function predictStockPrice(symbol: string, days: number = 7): Promi
 }
 
 export async function fetchMLQuote(symbol: string) {
+  const normalizedSymbol = normalizeSymbolForYFinance(symbol);
   try {
-    const response = await fetch(`${ML_API_URL}/market/quote/${symbol}`, {
+    const response = await fetch(`${ML_API_URL}/market/quote/${normalizedSymbol}`, {
       signal: AbortSignal.timeout(10000),
       cache: "no-store",
     });
@@ -166,8 +180,9 @@ export async function fetchMLQuote(symbol: string) {
 }
 
 export async function fetchMLHistory(symbol: string) {
+  const normalizedSymbol = normalizeSymbolForYFinance(symbol);
   try {
-    const response = await fetch(`${ML_API_URL}/market/history/${symbol}`, {
+    const response = await fetch(`${ML_API_URL}/market/history/${normalizedSymbol}`, {
       signal: AbortSignal.timeout(15000),
       cache: "no-store",
     });
